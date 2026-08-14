@@ -2,7 +2,8 @@ from PIL import Image, ImageDraw
 import pystray
 import os
 import winshell
-
+import winreg
+import sys
 #Картинка для иконки
 def create_image(filled=False):
     image = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
@@ -45,10 +46,39 @@ def open_basket(icon, item):
 def clear_basket(icon, item):
     winshell.recycle_bin().empty(confirm=False, show_progress=False, sound=False)
 
+REG_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
+APP_NAME = "FileBasket"
+
+#Автозапуск
+def is_autostart_enabled():
+    try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_READ)
+        winreg.QueryValueEx(key, APP_NAME)
+        winreg.CloseKey(key)
+        return True
+    except FileNotFoundError:
+        return False
+
+
+def toggle_autostart(icon, item):
+    if is_autostart_enabled():
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_SET_VALUE)
+        winreg.DeleteValue(key, APP_NAME)
+        winreg.CloseKey(key)
+    else:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_SET_VALUE)
+        winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, sys.executable)
+        winreg.CloseKey(key)
+
 #Меню
 menu = pystray.Menu(
     pystray.MenuItem('Открыть корзину', open_basket),
     pystray.MenuItem('Очистить корзину', clear_basket),
+    pystray.MenuItem(
+        'Запускать при старте Windows',
+        toggle_autostart,
+        checked=lambda item: is_autostart_enabled(),
+    ),
     pystray.MenuItem('Выход', on_quit)
     )
 
